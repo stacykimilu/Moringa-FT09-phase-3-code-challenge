@@ -1,96 +1,50 @@
-from database.connection import get_db_connection
-
 class Article:
     def __init__(self, id, title, content, author_id, magazine_id):
-        self.id = id
-        self.title = title
-        self.content = content
-        self.author_id = author_id
-        self.magazine_id = magazine_id
+        # Initialize Article attributes
+        self._id = id
+        self._title = title
+        self._content = content
+        self._author_id = author_id
+        self._magazine_id = magazine_id
 
-    def __repr__(self):
-        return f'<Article {self.title}>'    
+    @property
+    def id(self):
+        """Getter for article ID."""
+        return self._id
 
     @property
     def title(self):
+        """Getter for article title."""
         return self._title
-
-    @title.setter
-    def title(self, value):
-        if not isinstance(value, str) or not (5 <= len(value) <= 50):
-            raise ValueError("Title must be a string between 5 and 50 characters")
-        self._title = value
 
     @property
     def content(self):
+        """Getter for article content."""
         return self._content
 
-    @content.setter
-    def content(self, value):
-        if not isinstance(value, str) or len(value) == 0:
-            raise ValueError("Content must be a non-empty string")
-        self._content = value
-
-    def save(self):
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    @classmethod
+    def create_article(cls, cursor, title, content, author_id, magazine_id):
+        """Create a new article and insert it into the database."""
         cursor.execute("INSERT INTO articles (title, content, author_id, magazine_id) VALUES (?, ?, ?, ?)",
-                       (self.title, self.content, self.author_id, self.magazine_id))
-        self.id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-
-    @property
-    def author(self):
-        from models.author import Author
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT authors.* FROM authors
-            JOIN articles ON authors.id = articles.author_id
-            WHERE articles.id = ?
-        """, (self.id,))
-        row = cursor.fetchone()
-        conn.close()
-        return Author(row['id'], row['name']) if row else None
-
-    @property
-    def magazine(self):
-        from models.magazine import Magazine
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT magazines.* FROM magazines
-            JOIN articles ON magazines.id = articles.magazine_id
-            WHERE articles.id = ?
-        """, (self.id,))
-        row = cursor.fetchone()
-        conn.close()
-        return Magazine(row['id'], row['name'], row['category']) if row else None
+                       (title, content, author_id, magazine_id))
+        article_id = cursor.lastrowid
+        return cls(article_id, title, content, author_id, magazine_id)
 
     @classmethod
-    def create_table(cls):
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS articles (
-                id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL,
-                content TEXT NOT NULL,
-                author_id INTEGER NOT NULL,
-                magazine_id INTEGER NOT NULL,
-                FOREIGN KEY (author_id) REFERENCES authors(id),
-                FOREIGN KEY (magazine_id) REFERENCES magazines(id)
-            )
-        """)
-        conn.commit()
-        conn.close()
+    def get_titles(cls, cursor):
+        """Get all article titles from the database."""
+        cursor.execute("SELECT title FROM articles")
+        titles = cursor.fetchall()
+        return [title[0] for title in titles] if titles else None
 
-    @classmethod
-    def all(cls):
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM articles")
-        articles = cursor.fetchall()
-        conn.close()
-        return [cls(article['id'], article['title'], article['content'], article['author_id'], article['magazine_id']) for article in articles]
+    def get_author(self, cursor):
+        """Get the author name of the article."""
+        cursor.execute("SELECT name FROM authors WHERE id = ?", (self._author_id,))
+        author_name = cursor.fetchone()
+        return author_name[0] if author_name else None
+
+    def get_magazine(self, cursor):
+        """Get the magazine name of the article."""
+        cursor.execute("SELECT name FROM magazines WHERE id = ?", (self._magazine_id,))
+        magazine_name = cursor.fetchone()
+        return magazine_name[0] if magazine_name else None

@@ -1,57 +1,82 @@
-import sqlite3
-
 class Author:
-    def __init__(self, id, name):
+    def __init__(self, id=None, name=None):
+        """
+        Initialize Author instance.
+
+        Args:
+            id (int): Author ID.
+            name (str): Author name.
+        
+        Raises:
+            ValueError: If name is not provided or is not a non-empty string.
+        """
         self._id = id
-        self.name = name
-        self.save()
+        if name is not None:
+            if not isinstance(name, str) or len(name) == 0:
+                raise ValueError("Name must be a non-empty string")
+            self._name = name
+        else:
+            raise ValueError("Name must be provided")
 
     @property
     def id(self):
+        """Getter for author ID."""
         return self._id
 
     @property
     def name(self):
-        connection = sqlite3.connect('magazine.db')
-        cursor = connection.cursor()
-        cursor.execute('SELECT name FROM authors WHERE id = ?', (self._id,))
-        name = cursor.fetchone()[0]
-        connection.close()
-        return name
+        """Getter for author name."""
+        return self._name
 
     @name.setter
     def name(self, value):
-        if isinstance(value, str) and len(value) > 0:
-            self._name = value
-        else:
-            raise ValueError("Name must be a non-empty string")
+        """Setter for author name (raises an error)."""
+        raise AttributeError("Name cannot be changed after the author is instantiated")
 
-    def save(self):
-        connection = sqlite3.connect('magazine.db')
-        cursor = connection.cursor()
-        cursor.execute('INSERT INTO authors (name) VALUES (?)', (self._name,))
-        self._id = cursor.lastrowid
-        connection.commit()
-        connection.close()
+    def articles(self, cursor):
+        """
+        Get articles written by the author.
 
-    def articles(self):
-        connection = sqlite3.connect('magazine.db')
-        cursor = connection.cursor()
-        cursor.execute('''
-            SELECT * FROM articles WHERE author_id = ?
-        ''', (self._id,))
-        articles = cursor.fetchall()
-        connection.close()
-        return articles
+        Args:
+            cursor: Database cursor.
 
-    def magazines(self):
-        connection = sqlite3.connect('magazine.db')
-        cursor = connection.cursor()
-        cursor.execute('''
-            SELECT DISTINCT magazines.* FROM magazines
+        Returns:
+            List: Articles written by the author.
+        """
+        cursor.execute("SELECT * FROM articles WHERE author_id = ?", (self._id,))
+        articles_data = cursor.fetchall()
+        return articles_data
+
+    def magazines(self, cursor):
+        """
+        Get magazines the author has contributed to.
+
+        Args:
+            cursor: Database cursor.
+
+        Returns:
+            List: Magazines the author has contributed to.
+        """
+        cursor.execute("""
+            SELECT DISTINCT magazines.*
+            FROM magazines
             JOIN articles ON magazines.id = articles.magazine_id
             WHERE articles.author_id = ?
-        ''', (self._id,))
-        magazines = cursor.fetchall()
-        connection.close()
-        return magazines
+        """, (self._id,))
+        magazines_data = cursor.fetchall()
+        return magazines_data if magazines_data else None
+
+    @classmethod
+    def get_all_authors(cls, cursor):
+        """
+        Get all authors from the database.
+
+        Args:
+            cursor: Database cursor.
+
+        Returns:
+            List: All authors.
+        """
+        cursor.execute("SELECT * FROM authors")
+        authors_data = cursor.fetchall()
+        return [cls(id=author[0], name=author[1]) for author in authors_data]
